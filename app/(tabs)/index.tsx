@@ -1,98 +1,132 @@
-import { Image } from 'expo-image';
-import { Platform, StyleSheet } from 'react-native';
+import { View, StyleSheet, ImageSourcePropType, Platform } from 'react-native';
+import ImageViewer from '@/components/ImageViewer';
+import Button from '@/components/Button';
+import * as ImagePicker from 'expo-image-picker';
+import React, { RefObject, useEffect, useRef, useState } from 'react';
+import IconButton from '@/components/IconButton';
+import CircleButton from '@/components/CircleButton';
+import EmojiPicker from '@/components/EmojiPicker';
+import EmojiList from '@/components/EmojiList';
+import EmojiSticker from '@/components/EmojiSticker';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import {saveToLibraryAsync, usePermissions, } from 'expo-media-library';
+import { captureRef } from 'react-native-view-shot';
+import domToImage from 'dom-to-image';
 
-import { HelloWave } from '@/components/hello-wave';
-import ParallaxScrollView from '@/components/parallax-scroll-view';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { Link } from 'expo-router';
+const PlaceholderImage = require('@/assets/images/background-image.png');
 
-export default function HomeScreen() {
+export default function Index() {
+  const [permissionResponse, requestPermission] = usePermissions();
+  const [selectedImage, setSelectedImage] = useState<ImageSourcePropType>(PlaceholderImage);
+  const [showAppOptions, setShowAppOptions] = useState(false);
+  const [isVisible, setIsVisible] = useState(false);
+  const [selectedEmoji, setSelectedEmoji] = useState<ImageSourcePropType>();
+  const imageRef = useRef<View | Node>(null);
+
+  useEffect(() => {
+    if (!permissionResponse?.granted) {
+      requestPermission();
+    }
+  }, []);
+
+  const pickImageAsync = async () => {
+    let result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: 'images',
+      allowsEditing: true,
+      quality: 1
+    });
+
+    if (!result.canceled) {
+      setSelectedImage(result.assets[0].uri as ImageSourcePropType);
+      setShowAppOptions(true);
+    } else {
+      alert('please pick an image');
+    }
+  };
+
+  const resetHandler = () => {
+    setShowAppOptions(false);
+  };
+
+  const addHandler = () => {
+    setIsVisible(true);
+  };
+  const saveHandler = async () => {
+    try {
+      const isWeb = Platform.OS === 'web';
+      if(isWeb) {
+         const dataUrl = await domToImage.toJpeg(imageRef.current as Node, {
+          quality: 0.95,
+          width: 320,
+          height: 440,
+        });
+
+        let link = document.createElement('a');
+        link.download = 'sticker-smash.jpeg';
+        link.href = dataUrl;
+        link.click();
+        return;
+      }
+      const localUri = await captureRef(imageRef, {
+        height: 440,
+        quality: 1,
+      });
+
+      await saveToLibraryAsync(localUri);
+      if (localUri) {
+        alert('Saved!');
+      }
+    } catch (e) {
+      console.log(e);
+    }
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
-        />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12',
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction title="Action" icon="cube" onPress={() => alert('Action pressed')} />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert('Share pressed')}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert('Delete pressed')}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
-
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    <GestureHandlerRootView style={styles.container}>
+      <View style={styles.imageContainer}>
+        <View ref={imageRef as RefObject<View | null>} collapsable={false}>
+          <ImageViewer imgSource={selectedImage} />
+          {selectedEmoji && <EmojiSticker imageSize={80} stickerSource={selectedEmoji} />}
+        </View>
+      </View>
+      {showAppOptions ?
+        (<>
+          <View style={styles.actionButtonContainer}>
+            <View style={styles.actionButtonRow}>
+              <IconButton icon='refresh' label='Reset' onPress={resetHandler} />
+              <CircleButton onPress={addHandler}></CircleButton>
+              <IconButton icon='download' label='Save' onPress={saveHandler} />
+            </View>
+          </View>
+          <EmojiPicker isVisible={isVisible} onClose={() => setIsVisible(false)}>
+            <EmojiList onCloseModal={() => setIsVisible(false)} onSelect={(item) => { setSelectedEmoji(item) }} />
+          </EmojiPicker>
+        </>)
+        :
+        (<View>
+          <Button label='Choose a photo' theme='primary' onPress={pickImageAsync} />
+          <Button label='Use this photo' onPress={() => setShowAppOptions(true)} />
+        </View>)
+      }
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
+  container: {
+    flex: 1,
+    backgroundColor: '#25292e',
     alignItems: 'center',
-    gap: 8,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  imageContainer: {
+    flex: 1,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
+  actionButtonContainer: {
     position: 'absolute',
+    bottom: 80
   },
+  actionButtonRow: {
+    flexDirection: 'row',
+    alignItems: 'center'
+  }
 });
