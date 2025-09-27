@@ -52,6 +52,7 @@ Join our community of developers creating universal apps.
 
 ## create apk:
 
+- update eas.json to:
 ```json
 {
   "expo": {
@@ -109,4 +110,19 @@ Join our community of developers creating universal apps.
   }
 }
 
+```
+
+- install eas cli:
+```bash
+npm install -g eas-cli
+```
+
+- generate apk for app:
+```bash
+eas build --profile development --platform android
+```
+
+- install apk on connected device:
+```bash
+adb install <APK_FILE_NAME>
 ```
